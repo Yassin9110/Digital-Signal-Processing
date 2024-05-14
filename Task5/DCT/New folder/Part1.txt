@@ -1,0 +1,106 @@
+import tkinter as tk
+from tkinter import filedialog, messagebox
+import numpy as np
+import matplotlib.pyplot as plt
+
+def read_signal_file(filename):
+    with open(filename, 'r') as file:
+        lines = file.readlines()
+
+    signal_type = int(lines[0].strip())
+    is_periodic = int(lines[1].strip())
+    n_samples = int(lines[2].strip())
+
+    data_lines = lines[3:]
+
+    signal_data = []
+
+    for line in data_lines:
+        values = list(map(float, line.strip().split()))
+        signal_data.append(values)
+
+    return signal_type, is_periodic, n_samples, np.array(signal_data)
+
+def custom_dct(x):
+    N = len(x)
+    n = np.arange(N)
+    y = np.zeros(N)
+
+    for k in range(N):
+        y[k] = np.sum(x * np.cos((np.pi / (4 * N)) * (2 * n - 1) * (2 * k - 1)))
+
+    # Apply the scaling factor
+    y *= np.sqrt(2 / N)
+
+    return y
+
+def plot_signals(time, signal, dct_signal):
+    fig, axs = plt.subplots(2, 1, figsize=(8, 6))
+
+    axs[0].plot(time, signal, label='Original Signal')
+    axs[0].set_title('Original Signal')
+    axs[0].set_xlabel('Time')
+
+    axs[1].stem(dct_signal, label='Custom DCT Signal', basefmt='C3')
+    axs[1].set_title('Custom DCT Signal')
+    axs[1].set_xlabel('DCT Coefficients')
+
+    plt.tight_layout()
+    plt.show()
+
+def save_to_file(dct_signal, num_coefficients):
+    file_path = filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("Text files", "*.txt")])
+    if file_path:
+        with open(file_path, 'w') as file:
+            for i in range(num_coefficients):
+                file.write(f"0 {dct_signal[i]}\n")
+        messagebox.showinfo("Save Coefficients", f"{num_coefficients} coefficients saved successfully.")
+
+def browse_file():
+    filename = filedialog.askopenfilename(filetypes=[("Text files", "*.txt")])
+    if filename:
+        signal_type, is_periodic, n_samples, signal_data = read_signal_file(filename)
+        time = signal_data[:, 0] if signal_type == 0 else np.arange(n_samples)
+        dct_signal = custom_dct(signal_data[:, 1])
+
+        plot_signals(time, signal_data[:, 1], dct_signal)
+
+        # Enable the input for the number of coefficients
+        num_coefficients_label.config(state='normal')
+        num_coefficients_text.config(state='normal')
+        save_button.config(state='normal')
+
+        # Display the number of coefficients in the GUI
+        num_coefficients_text.delete(0, tk.END)
+        num_coefficients_text.insert(0, str(len(time)))
+
+        # Save selected coefficients to a text file
+        global dct_signal_global
+        dct_signal_global = dct_signal
+
+# Function to start the saving operation
+def start_saving():
+    try:
+        num_coefficients = int(num_coefficients_text.get())
+        save_to_file(dct_signal_global, num_coefficients)
+    except ValueError:
+        messagebox.showerror("Error", "Invalid input. Please enter a valid number.")
+
+# GUI setup
+root = tk.Tk()
+root.title("Custom DCT Signal Plotter")
+
+browse_button = tk.Button(root, text="Browse Signal File", command=browse_file)
+browse_button.pack(pady=10)
+
+# Entry for user to input the number of coefficients
+num_coefficients_label = tk.Label(root, text="Number of Coefficients to Save:")
+num_coefficients_label.pack()
+num_coefficients_text = tk.Entry(root, state='disabled')
+num_coefficients_text.pack()
+
+# Save button
+save_button = tk.Button(root, text="Save Coefficients", command=start_saving, state='disabled')
+save_button.pack(pady=10)
+
+root.mainloop()
